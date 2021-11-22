@@ -41,6 +41,18 @@ func NewDeploymentForCR(m *v1alpha1.Interconnect) *appsv1.Deployment {
 	for k, v := range m.Annotations {
 		annotations[k] = v
 	}
+	if DefaultInterconnectExtraAnnotations != "" {
+		annotateRegex := regexp.MustCompile(ValidRfc1123Label)
+		if annotateRegex.MatchString(DefaultInterconnectExtraAnnotations) {
+			s := strings.Split(DefaultInterconnectExtraAnnotations, ",")
+			for _, kv := range s {
+				parts := strings.Split(kv, "=")
+				if len(parts) > 1 {
+					annotations[parts[0]] = parts[1]
+				}
+			}
+		}
+	}
 	labels := selectors.LabelsForInterconnect(m.Name)
 	for k, v := range m.Labels {
 		labels[k] = v
@@ -157,8 +169,41 @@ func NewDeploymentForCR(m *v1alpha1.Interconnect) *appsv1.Deployment {
 
 // Create NewDaemonSetForCR method to create daemonset
 func NewDaemonSetForCR(m *v1alpha1.Interconnect) *appsv1.DaemonSet {
+	annotations := map[string]string{
+		"prometheus.io/port":   strconv.Itoa(int(m.Spec.DeploymentPlan.LivenessPort)),
+		"prometheus.io/scrape": "true",
+	}
+	for k, v := range m.Annotations {
+		annotations[k] = v
+	}
+	if DefaultInterconnectExtraAnnotations != "" {
+		annotateRegex := regexp.MustCompile(ValidRfc1123Label)
+		if annotateRegex.MatchString(DefaultInterconnectExtraAnnotations) {
+			s := strings.Split(DefaultInterconnectExtraAnnotations, ",")
+			for _, kv := range s {
+				parts := strings.Split(kv, "=")
+				if len(parts) > 1 {
+					annotations[parts[0]] = parts[1]
+				}
+			}
+		}
+	}
 	labels := selectors.LabelsForInterconnect(m.Name)
-
+	for k, v := range m.Labels {
+		labels[k] = v
+	}
+	if DefaultInterconnectExtraLabels != "" {
+		labelRegex := regexp.MustCompile(ValidRfc1123Label)
+		if labelRegex.MatchString(DefaultInterconnectExtraLabels) {
+			s := strings.Split(DefaultInterconnectExtraLabels, ",")
+			for _, kv := range s {
+				parts := strings.Split(kv, "=")
+				if len(parts) > 1 {
+					labels[parts[0]] = parts[1]
+				}
+			}
+		}
+	}
 	ds := &appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -174,11 +219,8 @@ func NewDaemonSetForCR(m *v1alpha1.Interconnect) *appsv1.DaemonSet {
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						"prometheus.io/port":   strconv.Itoa(int(m.Spec.DeploymentPlan.LivenessPort)),
-						"prometheus.io/scrape": "true",
-					},
+					Labels:      labels,
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: m.Name,
