@@ -107,6 +107,8 @@ type DeploymentPlanType struct {
 	Issuer       string                      `json:"issuer,omitempty"`
 	LivenessPort int32                       `json:"livenessPort,omitempty"`
 	ServiceType  string                      `json:"serviceType,omitempty"`
+	Labels       map[string]string           `json:"labels,omitempty"`
+	Annotations  map[string]string           `json:"annotations,omitempty"`
 }
 
 type Address struct {

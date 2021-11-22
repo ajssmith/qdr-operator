@@ -1,7 +1,9 @@
 package deployments
 
 import (
+	"regexp"
 	"strconv"
+	"strings"
 
 	v1alpha1 "github.com/interconnectedcloud/qdr-operator/pkg/apis/interconnectedcloud/v1alpha1"
 	"github.com/interconnectedcloud/qdr-operator/pkg/resources/containers"
@@ -32,7 +34,29 @@ func CheckDeployedContainer(actual *corev1.PodTemplateSpec, cr *v1alpha1.Interco
 
 // Create NewDeploymentForCR method to create deployment
 func NewDeploymentForCR(m *v1alpha1.Interconnect) *appsv1.Deployment {
+	annotations := map[string]string{
+		"prometheus.io/port":   strconv.Itoa(int(m.Spec.DeploymentPlan.LivenessPort)),
+		"prometheus.io/scrape": "true",
+	}
+	for k, v := range m.Annotations {
+		annotations[k] = v
+	}
 	labels := selectors.LabelsForInterconnect(m.Name)
+	for k, v := range m.Labels {
+		labels[k] = v
+	}
+	if DefaultInterconnectExtraLabels != "" {
+		labelRegex := regexp.MustCompile(ValidRfc1123Label)
+		if labelRegex.MatchString(DefaultInterconnectExtraLabels) {
+			s := strings.Split(DefaultInterconnectExtraLabels, ",")
+			for _, kv := range s {
+				parts := strings.Split(kv, "=")
+				if len(parts) > 1 {
+					labels[parts[0]] = parts[1]
+				}
+			}
+		}
+	}
 	replicas := m.Spec.DeploymentPlan.Size
 	affinity := &corev1.Affinity{}
 	if m.Spec.DeploymentPlan.Placement == v1alpha1.PlacementAntiAffinity {
@@ -71,11 +95,8 @@ func NewDeploymentForCR(m *v1alpha1.Interconnect) *appsv1.Deployment {
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						"prometheus.io/port":   strconv.Itoa(int(m.Spec.DeploymentPlan.LivenessPort)),
-						"prometheus.io/scrape": "true",
-					},
+					Labels:      labels,
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: m.Name,
